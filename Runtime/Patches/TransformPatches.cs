@@ -43,53 +43,61 @@ namespace TransformChangesDebugger.API.Patches
             {
                 var totalSw = new Stopwatch();
                 totalSw.Start();
-                
+
                 var methodInterceptionParams = new List<MethodInterceptionParams>();
-                var assemblyToMethodInterceptionParams = new Dictionary<FileInfo, RedirectSetterMethodsFromCallingCodeForAssyResult>();
-                
-                var notYetPatchedAssyFiles = assemblyPaths.Where(assemblyPath => !AlreadyPatchedAssyFilePaths.Contains(assemblyPath.FullName)).ToList();
+                var assemblyToMethodInterceptionParams =
+                    new Dictionary<FileInfo, RedirectSetterMethodsFromCallingCodeForAssyResult>();
+
+                var notYetPatchedAssyFiles = assemblyPaths
+                    .Where(assemblyPath => !AlreadyPatchedAssyFilePaths.Contains(assemblyPath.FullName)).ToList();
 
                 if (!notYetPatchedAssyFiles.Any())
                 {
-                    return new RedirectSetterMethodsFromCallingCodeResult(new List<RedirectSetterMethodsFromCallingCodeForAssyResult>(), totalSw.ElapsedMilliseconds);
-                }
-                
-                InterceptMethodsToEnableChangeTrackingStarted?.Invoke(null, EventArgs.Empty);
-                startEventFired = true;
-                
-                //Read all types upfront so we're sure they are loaded in to memory and can be patched
-                using (var unityModule = ModuleDefinition.ReadModule(typeof(Transform).Module.FullyQualifiedName))
-                foreach (var assemblyPath in notYetPatchedAssyFiles)
-                {
-                    var timeTakenToFindMethodsSw = new Stopwatch();
-                    timeTakenToFindMethodsSw.Start();
-                    
-                    var findMethodsWithInstructionsToInterceptResults = FindMethodsWithInstructionsToIntercept(assemblyPath, unityModule);
-                    var methodInterceptionParamsForSingleAssy = findMethodsWithInstructionsToInterceptResults
-                        .SelectMany(r => r.MethodInterceptionParams)
-                        .ToList();
-                    //That's a bit of a simplification, potentially some of the entries can be cache and some not in same assy, that really will happen very rarely, simplified to treat as all from cache if any is from cache
-                    var isAnyFindSettersToPatchResolvedFromCache = findMethodsWithInstructionsToInterceptResults
-                        .Where(r => r.MethodToPathCacheKey.AssemblyFullPath == assemblyPath.FullName)
-                        .Any(r => r.IsFromCache);
-                    assemblyToMethodInterceptionParams.Add(assemblyPath, new RedirectSetterMethodsFromCallingCodeForAssyResult(assemblyPath,
-                        timeTakenToFindMethodsSw.ElapsedMilliseconds, 
-                        methodInterceptionParamsForSingleAssy,
-                        isAnyFindSettersToPatchResolvedFromCache
-                    ));
+                    return new RedirectSetterMethodsFromCallingCodeResult(
+                        new List<RedirectSetterMethodsFromCallingCodeForAssyResult>(), totalSw.ElapsedMilliseconds);
                 }
 
-      
+                InterceptMethodsToEnableChangeTrackingStarted?.Invoke(null, EventArgs.Empty);
+                startEventFired = true;
+
+                //Read all types upfront so we're sure they are loaded in to memory and can be patched
+                using (var unityModule = ModuleDefinition.ReadModule(typeof(Transform).Module.FullyQualifiedName))
+                    foreach (var assemblyPath in notYetPatchedAssyFiles)
+                    {
+                        var timeTakenToFindMethodsSw = new Stopwatch();
+                        timeTakenToFindMethodsSw.Start();
+
+                        var findMethodsWithInstructionsToInterceptResults =
+                            FindMethodsWithInstructionsToIntercept(assemblyPath, unityModule);
+                        var methodInterceptionParamsForSingleAssy = findMethodsWithInstructionsToInterceptResults
+                            .SelectMany(r => r.MethodInterceptionParams)
+                            .ToList();
+                        //That's a bit of a simplification, potentially some of the entries can be cache and some not in same assy, that really will happen very rarely, simplified to treat as all from cache if any is from cache
+                        var isAnyFindSettersToPatchResolvedFromCache = findMethodsWithInstructionsToInterceptResults
+                            .Where(r => r.MethodToPathCacheKey.AssemblyFullPath == assemblyPath.FullName)
+                            .Any(r => r.IsFromCache);
+                        assemblyToMethodInterceptionParams.Add(assemblyPath,
+                            new RedirectSetterMethodsFromCallingCodeForAssyResult(assemblyPath,
+                                timeTakenToFindMethodsSw.ElapsedMilliseconds,
+                                methodInterceptionParamsForSingleAssy,
+                                isAnyFindSettersToPatchResolvedFromCache
+                            ));
+                    }
+
+
                 foreach (var assemblyPath in notYetPatchedAssyFiles)
                 {
-                    var methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair = assemblyToMethodInterceptionParams[assemblyPath];
-                    var methodInterceptionParamsForSingleAssy = methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.MethodInterceptionParamEntries;
+                    var methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair =
+                        assemblyToMethodInterceptionParams[assemblyPath];
+                    var methodInterceptionParamsForSingleAssy =
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair
+                            .MethodInterceptionParamEntries;
                     if (methodInterceptionParamsForSingleAssy.Any())
                     {
                         methodInterceptionParams.AddRange(methodInterceptionParamsForSingleAssy);
 
                         var perMethodPatchingDurations = new Dictionary<MethodInterceptionParams, long>();
-                        
+
                         var timeTakenToPatchMethodsSw = new Stopwatch();
                         timeTakenToPatchMethodsSw.Start();
                         foreach (var methodInterceptorParam in methodInterceptionParamsForSingleAssy)
@@ -97,24 +105,31 @@ namespace TransformChangesDebugger.API.Patches
                             var timeTakenToPatchMethodsSingleMethodSw = new Stopwatch();
                             timeTakenToPatchMethodsSingleMethodSw.Start();
 
-                            var interceptCallParamsForType = TranspiledMethodDefinitions.InterceptionTypeToInterceptCallParameters[methodInterceptorParam.PatchingDueToInterceptedMethodCallFullName];
+                            var interceptCallParamsForType =
+                                TranspiledMethodDefinitions.InterceptionTypeToInterceptCallParameters[
+                                    methodInterceptorParam.PatchingDueToInterceptedMethodCallFullName];
                             //PERF: patching can take a while, especially for bigger assy like UnityEngine.Core - how to get that speed up?
-                            harmony.Patch(methodInterceptorParam.MethodDefinition.ResolveReflection(), transpiler: interceptCallParamsForType.Transpiler);
-                            
-                            perMethodPatchingDurations.Add(methodInterceptorParam, timeTakenToPatchMethodsSingleMethodSw.ElapsedMilliseconds);
+                            harmony.Patch(methodInterceptorParam.MethodDefinition.ResolveReflection(),
+                                transpiler: interceptCallParamsForType.Transpiler);
+
+                            perMethodPatchingDurations.Add(methodInterceptorParam,
+                                timeTakenToPatchMethodsSingleMethodSw.ElapsedMilliseconds);
                         }
 
-                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.TimeTakenToPatchMethods  = timeTakenToPatchMethodsSw.ElapsedMilliseconds;
-                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.TimeTakenPerMethodInterceptionParamToPatchMethods = perMethodPatchingDurations;
-                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.IsPatchAssemblyExecuted = true;
-                        
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.TimeTakenToPatchMethods =
+                            timeTakenToPatchMethodsSw.ElapsedMilliseconds;
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair
+                            .TimeTakenPerMethodInterceptionParamToPatchMethods = perMethodPatchingDurations;
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.IsPatchAssemblyExecuted =
+                            true;
+
                         AlreadyPatchedAssyFilePaths.Add(assemblyPath.FullName);
                     }
                 }
 
                 foreach (var alreadyPatchedPreviouslyAssyFile in assemblyPaths.Except(notYetPatchedAssyFiles))
                 {
-                    assemblyToMethodInterceptionParams.Add(alreadyPatchedPreviouslyAssyFile, 
+                    assemblyToMethodInterceptionParams.Add(alreadyPatchedPreviouslyAssyFile,
                         new RedirectSetterMethodsFromCallingCodeForAssyResult(
                             alreadyPatchedPreviouslyAssyFile,
                             0,
@@ -129,6 +144,11 @@ namespace TransformChangesDebugger.API.Patches
                     totalSw.ElapsedMilliseconds
                 );
                 return result;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Unable to patch assembles, {e.Message}");
+                return null;
             }
             finally
             {
@@ -226,7 +246,7 @@ namespace TransformChangesDebugger.API.Patches
                 var instructionsInjectedBeforeCurrentInstructions = false;
                 var instruction = instructionsAsList[i];
                 LocalBuilder callingOnVariable = null;
-                Label jumpLabelAfterSetter;
+                Label jumpLabelAfterSetter = new Label();
                 if ((instruction.operand as MethodBase)?.ResolveFullName() == fullMethodNameToTrack)
                 {
                     instructionsToReturn.Clear();
