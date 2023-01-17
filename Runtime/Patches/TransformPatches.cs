@@ -102,26 +102,28 @@ namespace TransformChangesDebugger.API.Patches
                         timeTakenToPatchMethodsSw.Start();
                         foreach (var methodInterceptorParam in methodInterceptionParamsForSingleAssy)
                         {
-                            var timeTakenToPatchMethodsSingleMethodSw = new Stopwatch();
-                            timeTakenToPatchMethodsSingleMethodSw.Start();
+                            try
+                            {
+                                var timeTakenToPatchMethodsSingleMethodSw = new Stopwatch();
+                                timeTakenToPatchMethodsSingleMethodSw.Start();
 
-                            var interceptCallParamsForType =
-                                TranspiledMethodDefinitions.InterceptionTypeToInterceptCallParameters[
-                                    methodInterceptorParam.PatchingDueToInterceptedMethodCallFullName];
-                            //PERF: patching can take a while, especially for bigger assy like UnityEngine.Core - how to get that speed up?
-                            harmony.Patch(methodInterceptorParam.MethodDefinition.ResolveReflection(),
-                                transpiler: interceptCallParamsForType.Transpiler);
+                                var interceptCallParamsForType = TranspiledMethodDefinitions.InterceptionTypeToInterceptCallParameters[methodInterceptorParam.PatchingDueToInterceptedMethodCallFullName];
+                                //PERF: patching can take a while, especially for bigger assy like UnityEngine.Core - how to get that speed up?
+                                harmony.Patch(methodInterceptorParam.MethodDefinition.ResolveReflection(), transpiler: interceptCallParamsForType.Transpiler);
 
-                            perMethodPatchingDurations.Add(methodInterceptorParam,
-                                timeTakenToPatchMethodsSingleMethodSw.ElapsedMilliseconds);
+                                perMethodPatchingDurations.Add(methodInterceptorParam,
+                                    timeTakenToPatchMethodsSingleMethodSw.ElapsedMilliseconds);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.LogWarning($"Unable to patch method: {methodInterceptorParam.MethodDefinition.FullName} - this is usually down to code pattern that tool can not handle. Changes coming from this method will not be captured. Please get in touch if it's causing issues. Error: {e}");
+                            }
                         }
 
-                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.TimeTakenToPatchMethods =
-                            timeTakenToPatchMethodsSw.ElapsedMilliseconds;
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.TimeTakenToPatchMethods = timeTakenToPatchMethodsSw.ElapsedMilliseconds;
                         methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair
                             .TimeTakenPerMethodInterceptionParamToPatchMethods = perMethodPatchingDurations;
-                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.IsPatchAssemblyExecuted =
-                            true;
+                        methodInterceptionParamsForSingleAssyWithTimeTakenToFindMethodsPair.IsPatchAssemblyExecuted = true;
 
                         AlreadyPatchedAssyFilePaths.Add(assemblyPath.FullName);
                     }
