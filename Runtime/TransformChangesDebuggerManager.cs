@@ -83,12 +83,18 @@ namespace TransformChangesDebugger.API
             AllUserPatchableAssyPaths = allAvailableAssyPaths
                 .Where(a => PreExcludeSystemAssemblyFromHarmonyPatchingIfFullPathContains.All(e => !a.FullName.Contains(e)))
                 .ToList();
-            
-            if(!IsTrackingEnabled 
-               #if UNITY_EDITOR
-               || !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode 
-               #endif
-               || !GameObject.FindObjectOfType<TrackTransformChanges>()) return;
+
+            if (!IsTrackingEnabled
+#if UNITY_EDITOR
+               || !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode
+#endif
+                || (!GameObject.FindObjectOfType<TrackTransformChanges>() &&
+                    !TransformChangesTracker.InitializeTrackingEvenWithoutAnyTrackedObjects)
+               )
+            {
+                Debug.Log("TransformChangesDebuggerManager is disabled, no tracking will take place till enabled.");
+                return;
+            }
             
             var sw = new Stopwatch();
             sw.Start();

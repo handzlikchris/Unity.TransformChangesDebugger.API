@@ -25,6 +25,11 @@ namespace TransformChangesDebugger.API
         /// </summary>
         public static int KeepChangesDataForMaximumNumberOfFrames { get; set; } = 1000; 
         
+        /// <summary>
+        /// Enable for tracking to initialize regardless of scene having any TrackTransformChanges objects initially. This is helpful if you're tracking dynamically instantiated objects.
+        /// </summary>
+        public static bool InitializeTrackingEvenWithoutAnyTrackedObjects { get; set; } = false; 
+        
         //PERF: potentially might need to pool TransformChange objects?
         private static readonly Dictionary<int, Dictionary<TrackTransformChanges, List<TransformChange>>> FrameToChangedObjectToChangesMap = new Dictionary<int, Dictionary<TrackTransformChanges, List<TransformChange>>>();
         private static readonly Dictionary<TrackTransformChanges, List<InterceptedCallbackBase>> TrackTransformChangeToRegisteredCallbacksMap = new Dictionary<TrackTransformChanges, List<InterceptedCallbackBase>>();
